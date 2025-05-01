@@ -1,0 +1,560 @@
+import { useRef, useMemo, useState } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { Text, Line, Stars, Environment, Html, Float, Sphere, Ring, OrbitControls, Billboard, Points, PointMaterial, useTexture } from '@react-three/drei'
+import { useStore } from '../store/useStore'
+import { useTheme } from '../contexts/ThemeContext'
+import * as THREE from 'three'
+
+interface Planet {
+    id: string
+    name: string
+    description: string
+    icon: string
+    position: [number, number, number]
+    size: number
+    color: string
+    rotationSpeed: number
+    orbitRadius: number
+    orbitSpeed: number
+    content: {
+        title: string
+        items: Array<{
+            id: string
+            title: string
+            description: string
+            link?: string
+        }>
+    }
+}
+
+type WorldTheme = 'space' | 'island'
+
+const createSolarSystem = () => {
+    const planets: Planet[] = [
+        {
+            id: 'profile',
+            name: 'Professional Profile',
+            description: 'My professional journey and expertise',
+            icon: '👨‍💻',
+            position: [0, 0, 0],
+            size: 2,
+            color: '#4A90E2',
+            rotationSpeed: 0.9,
+            orbitRadius: 0.1,
+            orbitSpeed: 1,
+            content: {
+                title: 'Professional Experience',
+                items: [
+                    {
+                        id: 'exp1',
+                        title: 'Senior Developer',
+                        description: 'Leading development teams and projects',
+                    },
+                    {
+                        id: 'exp2',
+                        title: 'Full Stack Developer',
+                        description: 'Building scalable web applications',
+                    }
+                ]
+            }
+        },
+        {
+            id: 'projects',
+            name: 'Projects',
+            description: 'My technical projects and achievements',
+            icon: '🚀',
+            position: [6, 0, 0],
+            size: 2,
+            color: '#E24A4A',
+            rotationSpeed: 0.5,
+            orbitRadius: 10,
+            orbitSpeed: 1,
+            content: {
+                title: 'Featured Projects',
+                items: [
+                    {
+                        id: 'proj1',
+                        title: 'AI Assistant',
+                        description: 'An AI-powered assistant built with React and OpenAI',
+                        link: 'https://github.com/yourusername/ai-assistant'
+                    },
+                    {
+                        id: 'proj2',
+                        title: 'E-commerce Platform',
+                        description: 'A full-stack e-commerce solution',
+                        link: 'https://github.com/yourusername/ecommerce'
+                    }
+                ]
+            }
+        },
+        {
+            id: 'hobbies',
+            name: 'Hobbies',
+            description: 'My creative and personal interests',
+            icon: '🎨',
+            position: [10, 0, 0],
+            size: 2,
+            color: '#4AE24A',
+            rotationSpeed: 0.4,
+            orbitRadius: 14,
+            orbitSpeed: 0.6,
+            content: {
+                title: 'Creative Pursuits',
+                items: [
+                    {
+                        id: 'hobby1',
+                        title: 'Digital Art',
+                        description: 'Creating digital illustrations and designs'
+                    },
+                    {
+                        id: 'hobby2',
+                        title: 'Photography',
+                        description: 'Capturing moments and landscapes'
+                    }
+                ]
+            }
+        },
+        {
+            id: 'skills',
+            name: 'Skills',
+            description: 'My technical expertise and capabilities',
+            icon: '⚡',
+            position: [14, 0, 0],
+            size: 2,
+            color: '#E2E24A',
+            rotationSpeed: 0.3,
+            orbitRadius: 18,
+            orbitSpeed: 0.4,
+            content: {
+                title: 'Technical Skills',
+                items: [
+                    {
+                        id: 'skill1',
+                        title: 'Frontend Development',
+                        description: 'React, TypeScript, Next.js'
+                    },
+                    {
+                        id: 'skill2',
+                        title: 'Backend Development',
+                        description: 'Node.js, Python, Databases'
+                    }
+                ]
+            }
+        }
+    ]
+
+    return { planets }
+}
+
+function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
+    planet: Planet;
+    onSelect: (planet: Planet) => void;
+    theme: WorldTheme;
+    isTransitioning: boolean;
+}) {
+    const { currentTheme } = useTheme()
+    const [hovered, setHovered] = useState(false)
+    const meshRef = useRef<THREE.Mesh>(null)
+    const groupRef = useRef<THREE.Group>(null)
+    const [transitionProgress, setTransitionProgress] = useState(0)
+    const initialPosition = useRef<THREE.Vector3>(new THREE.Vector3())
+    const targetPosition = useRef<THREE.Vector3>(new THREE.Vector3())
+    const lastTheme = useRef(theme)
+    const lastOrbitalAngle = useRef(Math.random() * Math.PI * 2)
+    const fixedIslandPosition = useRef<THREE.Vector3>(new THREE.Vector3())
+
+    // Smooth easing function
+    const easeInOutCubic = (x: number): number => {
+        return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+    }
+
+    useFrame((state, delta) => {
+        if (meshRef.current) {
+            meshRef.current.rotation.y += planet.rotationSpeed * delta
+        }
+
+        if (groupRef.current && planet.orbitRadius > 0) {
+            if (isTransitioning) {
+                // Store initial position when transition starts
+                if (transitionProgress === 0) {
+                    const x = Math.cos(lastOrbitalAngle.current) * planet.orbitRadius
+                    const z = Math.sin(lastOrbitalAngle.current) * planet.orbitRadius
+                    initialPosition.current.set(x, groupRef.current.position.y, z)
+                    targetPosition.current.set(x, theme === 'space' ? 0 : -2, z)
+
+                    // Store the final island position when transitioning to island theme
+                    if (theme === 'island') {
+                        fixedIslandPosition.current.set(x, -2, z)
+                    }
+                }
+
+                // Use smooth easing
+                const easedProgress = easeInOutCubic(transitionProgress)
+
+                // Calculate target angle based on theme
+                const targetAngle = theme === 'space'
+                    ? lastOrbitalAngle.current + delta * planet.orbitSpeed * (1 - easedProgress)
+                    : lastOrbitalAngle.current
+
+
+                // Interpolate between current and target angles with easing
+                const interpolatedAngle = THREE.MathUtils.lerp(
+                    lastOrbitalAngle.current,
+                    targetAngle,
+                    easedProgress
+                )
+
+                // Update last orbital angle
+                lastOrbitalAngle.current = interpolatedAngle
+                console.log("Transitioning with lastOrbitalAngle.current: ", lastOrbitalAngle.current)
+
+                // Calculate position with eased height transition
+                const x = Math.cos(interpolatedAngle) * planet.orbitRadius
+                const z = Math.sin(interpolatedAngle) * planet.orbitRadius
+                const newY = THREE.MathUtils.lerp(
+                    initialPosition.current.y,
+                    targetPosition.current.y,
+                    easedProgress
+                )
+
+                groupRef.current.position.set(x, newY, z)
+
+            } else {
+                if (theme === 'space') {
+                    // In space theme, normal orbital motion
+                    lastOrbitalAngle.current += delta * planet.orbitSpeed
+                    lastOrbitalAngle.current %= Math.PI * 2;
+                    const x = Math.cos(lastOrbitalAngle.current) * planet.orbitRadius
+                    const z = Math.sin(lastOrbitalAngle.current) * planet.orbitRadius
+                    groupRef.current.position.set(x, 0, z)
+                    console.log("Not transitioning with lastOrbitalAngle.current: ", lastOrbitalAngle.current)
+                } else {
+                    // In island theme, use fixed position with small wave motion
+                    const waveY = Math.sin(delta * 0.5) * 0.1 // Reduced wave height
+                    groupRef.current.position.set(
+                        fixedIslandPosition.current.x,
+                        fixedIslandPosition.current.y + waveY,
+                        fixedIslandPosition.current.z
+                    )
+                }
+            }
+        }
+
+        // Update transition progress with smoother timing
+        if (isTransitioning) {
+            setTransitionProgress(prev => {
+                const newProgress = Math.min(prev + 0.005, 1) // Slower transition
+                return newProgress
+            })
+        } else {
+            setTransitionProgress(0)
+        }
+
+        // Reset transition when theme changes
+        if (lastTheme.current !== theme) {
+            setTransitionProgress(0)
+            lastTheme.current = theme
+        }
+    })
+
+    const getMaterial = () => {
+        if (theme === 'space') {
+            return (
+                <meshPhysicalMaterial
+                    color={planet.color}
+                    metalness={0.8}
+                    roughness={0.2}
+                    emissive={hovered ? planet.color : '#000000'}
+                    emissiveIntensity={hovered ? 0.5 : 0}
+                    transparent
+                    opacity={0.9}
+                />
+            )
+        } else {
+            return (
+                <meshStandardMaterial
+                    color={planet.id === 'profile' ? '#4CAF50' : '#FFC107'} // Green for main island, yellow for others
+                    roughness={0.8}
+                    metalness={0.2}
+                />
+            )
+        }
+    }
+
+    return (
+        <Float
+            speed={theme === 'space' ? 1.2 : 0.5}
+            rotationIntensity={theme === 'space' ? 0.2 : 0.1}
+            floatIntensity={theme === 'space' ? 0.2 : 0.1}
+        >
+            <group ref={groupRef} position={planet.orbitRadius === 0 ? planet.position : [0, 0, 0]}>
+                <Sphere args={[planet.size, 32, 32]} ref={meshRef}>
+                    {getMaterial()}
+                </Sphere>
+                {theme === 'space' && (
+                    <Ring args={[planet.size + 0.2, planet.size + 0.4, 32]} rotation={[Math.PI / 2, 0, 0]}>
+                        <meshBasicMaterial
+                            color={planet.color}
+                            transparent
+                            opacity={0.3}
+                        />
+                    </Ring>
+                )}
+                <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
+                    <Text
+                        position={[0, planet.size + 0.5, 0]}
+                        fontSize={0.5}
+                        color={currentTheme.colors.foreground}
+                        anchorX="center"
+                        anchorY="middle"
+                        outlineWidth={0.02}
+                        outlineColor={currentTheme.colors.background}
+                    >
+                        {planet.name}
+                    </Text>
+                </Billboard>
+                {hovered && (
+                    <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
+                        <Html position={[0, planet.size + 1, 0]} center>
+                            <div className="bg-theme-background/90 p-4 rounded-lg shadow-lg max-w-xs border border-theme-accent/20">
+                                <h3 className="text-theme-foreground font-bold text-lg">{planet.content.title}</h3>
+                                <div className="mt-2 space-y-2">
+                                    {planet.content.items.map((item) => (
+                                        <div key={item.id} className="border-b border-theme-accent/20 pb-2">
+                                            <h4 className="text-theme-foreground font-semibold">{item.title}</h4>
+                                            <p className="text-theme-muted text-sm">{item.description}</p>
+                                            {item.link && (
+                                                <a
+                                                    href={item.link}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-theme-accent text-sm hover:underline"
+                                                >
+                                                    View Project →
+                                                </a>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </Html>
+                    </Billboard>
+                )}
+            </group>
+        </Float>
+    )
+}
+
+export function PortfolioWorld() {
+    const { planets } = useMemo(() => createSolarSystem(), [])
+    const { currentTheme } = useTheme()
+    const isDarkMode = useStore((state) => state.isDarkMode)
+    const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null)
+    const [worldTheme, setWorldTheme] = useState<WorldTheme>('space')
+    const [isTransitioning, setIsTransitioning] = useState(false)
+    const [transitionProgress, setTransitionProgress] = useState(0)
+    const seaPlaneRef = useRef<THREE.Mesh>(null)
+    const [showSeaPlane, setShowSeaPlane] = useState(false)
+
+    // Generate random points for particles
+    const particles = useMemo(() => {
+        const temp = []
+        for (let i = 0; i < 2000; i++) {
+            const x = (Math.random() - 0.5) * 50
+            const y = (Math.random() - 0.5) * 50
+            const z = (Math.random() - 0.5) * 50
+            temp.push(x, y, z)
+        }
+        return new Float32Array(temp)
+    }, [])
+
+    // Smooth easing function
+    const easeInOutCubic = (x: number): number => {
+        return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+    }
+
+    useFrame((state, delta) => {
+        // Update transition progress with smoother timing
+        if (isTransitioning) {
+            setTransitionProgress(prev => {
+                const newProgress = Math.min(prev + 0.005, 1) // Slower transition
+                return newProgress
+            })
+        } else {
+            setTransitionProgress(0)
+        }
+
+        // Animate sea plane
+        if (seaPlaneRef.current) {
+            const targetY = worldTheme === 'space' ? -20 : -2
+            const currentY = seaPlaneRef.current.position.y
+            const easedProgress = easeInOutCubic(transitionProgress)
+            
+            if (isTransitioning) {
+                seaPlaneRef.current.position.y = THREE.MathUtils.lerp(
+                    currentY,
+                    targetY,
+                    easedProgress
+                )
+
+                // Update sea plane visibility
+                if (worldTheme === 'space' && transitionProgress > 0.9) {
+                    setShowSeaPlane(false)
+                } else if (worldTheme === 'island' && transitionProgress > 0.1) {
+                    setShowSeaPlane(true)
+                }
+            } else {
+                seaPlaneRef.current.position.y = targetY
+                setShowSeaPlane(worldTheme === 'island')
+            }
+        }
+    })
+
+    const handleThemeSwitch = () => {
+        setIsTransitioning(true)
+        setWorldTheme(prev => prev === 'space' ? 'island' : 'space')
+        // Reset transition state after animation
+        setTimeout(() => setIsTransitioning(false), 4000)
+    }
+
+    return (
+        <>
+            {/* Background Elements */}
+            <color attach="background" args={[isDarkMode ? currentTheme.colors.background : currentTheme.colors.foreground]} />
+            {worldTheme === 'space' ? (
+                <>
+                    <Stars radius={100} depth={50} count={5000} factor={4} saturation={0.2} fade speed={1} />
+                    <Environment preset="night" />
+                </>
+            ) : (
+                <>
+                    <Environment preset="sunset" />
+                </>
+            )}
+            {/* Sea plane is always rendered but controlled by visibility */}
+            <mesh 
+                ref={seaPlaneRef}
+                rotation={[-Math.PI / 2, 0, 0]} 
+                position={[0, -20, 0]} // Start from below
+                visible={showSeaPlane}
+            >
+                <planeGeometry args={[100, 100]} />
+                <meshStandardMaterial
+                    color="#2196F3" // Blue water color
+                    roughness={0.1}
+                    metalness={0.2}
+                    transparent
+                    opacity={0.8}
+                />
+            </mesh>
+            <fog attach="fog" args={[currentTheme.colors.background, 30, 100]} />
+
+            {/* Main Scene */}
+            <group>
+                {/* Planets/Islands */}
+                {planets.map((planet) => (
+                    <group key={planet.id}>
+                        <PlanetNode
+                            planet={planet}
+                            onSelect={setSelectedPlanet}
+                            theme={worldTheme}
+                            isTransitioning={isTransitioning}
+                        />
+
+                        {/* Orbit Ring/Water Ripple */}
+                        {planet.orbitRadius > 0 && (
+                            <Ring
+                                args={[planet.orbitRadius - 0.1, planet.orbitRadius + 0.1, 128]}
+                                rotation={[Math.PI / 2, 0, 0]}
+                            >
+                                <meshBasicMaterial
+                                    color={worldTheme === 'space' ? planet.color : '#2196F3'}
+                                    transparent
+                                    opacity={0.1}
+                                />
+                            </Ring>
+                        )}
+                    </group>
+                ))}
+
+                {/* Orbital Paths/Water Currents */}
+                {planets.map((planet) => (
+                    planet.orbitRadius > 0 && (
+                        <Line
+                            key={`orbit-${planet.id}`}
+                            points={Array.from({ length: 64 }, (_, i) => {
+                                const angle = (i / 64) * Math.PI * 2
+                                return [
+                                    Math.cos(angle) * planet.orbitRadius,
+                                    0,
+                                    Math.sin(angle) * planet.orbitRadius
+                                ]
+                            })}
+                            color={worldTheme === 'space' ? planet.color : '#2196F3'}
+                            lineWidth={1}
+                            opacity={0.2}
+                            transparent
+                            dashed
+                            dashScale={2}
+                            dashSize={0.5}
+                            gapSize={0.5}
+                        />
+                    )
+                ))}
+
+                {/* Connection Lines/Water Paths */}
+                {planets.map((planet) => (
+                    planet.id !== 'profile' && currentTheme.name === 'space' && (
+                        <Line
+                            key={`connection-${planet.id}`}
+                            points={[[0, 0, 0], planet.position]}
+                            color={worldTheme === 'space' ? planet.color : '#2196F3'}
+                            lineWidth={1}
+                            opacity={0.2}
+                            transparent
+                            dashed
+                            dashScale={2}
+                            dashSize={0.5}
+                            gapSize={0.5}
+                        />
+                    )
+                ))}
+
+                {/* Ambient Particles/Bubbles */}
+                <Points>
+                    <bufferGeometry>
+                        <bufferAttribute
+                            attach="attributes-position"
+                            args={[particles, 3]}
+                        />
+                    </bufferGeometry>
+                    <PointMaterial
+                        transparent
+                        color={worldTheme === 'space' ? currentTheme.colors.accent : '#2196F3'}
+                        size={0.02}
+                        sizeAttenuation
+                        depthWrite={false}
+                        blending={THREE.AdditiveBlending}
+                    />
+                </Points>
+
+                {/* Theme Switcher */}
+                <Html position={[0, 10, 0]} center>
+                    <button
+                        onClick={handleThemeSwitch}
+                        className="bg-white/10 hover:bg-white/20 text-white px-6 py-2.5 rounded-full transition-all backdrop-blur-md border border-white/20 shadow-lg"
+                        style={{
+                            fontFamily: 'system-ui, sans-serif',
+                            fontSize: '0.875rem',
+                            letterSpacing: '0.025em',
+                            textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1), inset 0 1px 1px rgba(255,255,255,0.1)'
+                        }}
+                    >
+                        Switch to {worldTheme === 'space' ? 'Island' : 'Space'} Theme
+                    </button>
+                </Html>
+            </group>
+        </>
+    )
+}
