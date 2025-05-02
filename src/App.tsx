@@ -28,11 +28,11 @@ function ThemeSwitcher() {
 }
 
 function ProgressOverlay() {
-  const [achievements, setAchievements] = useState<string[]>([])
+  const [achievements, _] = useState<string[]>([])
   const totalAchievements = 2 // Update this based on your total achievements
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 bg-theme-background/80 backdrop-blur-sm p-4 rounded-lg shadow-lg">
+    <div className="fixed bottom-4 left-4 z-50 bg-theme-background backdrop-blur-sm p-4 rounded-lg shadow-lg">
       <h3 className="text-theme-foreground font-bold mb-2">Progress</h3>
       <div className="flex items-center gap-2">
         <div className="w-32 h-2 bg-theme-muted rounded-full">
@@ -68,14 +68,15 @@ function AppContent() {
           <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             Portfolio Explorer
           </h1>
-          {/* <button
+          <button
+            style={{ display: 'none' }}
             onClick={toggleDarkMode}
             className={`p-2 rounded-lg ${
               isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-900'
             }`}
           >
             {isDarkMode ? '🌞' : '🌙'}
-          </button> */}
+          </button>
         </div>
       </nav>
       <ThemeSwitcher />
@@ -106,3 +107,44 @@ export default function App() {
     </ThemeProvider>
   )
 }
+/*
+
+import { useLoader, useFrame } from '@react-three/fiber';
+import { TextureLoader } from 'three';
+import { useRef } from 'react';
+import * as THREE from 'three';
+
+// Load PBR Textures
+const rockTextures = {
+  map: useLoader(TextureLoader, '/textures/rock/albedo.jpg'),
+  normalMap: useLoader(TextureLoader, '/textures/rock/normal.jpg'),
+  roughnessMap: useLoader(TextureLoader, '/textures/rock/roughness.jpg'),
+};
+
+const grassTextures = {
+  map: useLoader(TextureLoader, '/textures/grass/albedo.jpg'),
+  normalMap: useLoader(TextureLoader, '/textures/grass/normal.jpg'),
+  roughnessMap: useLoader(TextureLoader, '/textures/grass/roughness.jpg'),
+};
+
+// Island Component
+const FloatingIsland = ({ islandGeometryRef }) => {
+  const meshRef = useRef();
+
+  // Blend between rock & grass based on Y position (optional, advanced)
+  const customMaterial = new THREE.MeshStandardMaterial({
+    // Use one or the other here or write a shader to blend them
+    map: grassTextures.map,
+    normalMap: grassTextures.normalMap,
+    roughnessMap: grassTextures.roughnessMap,
+  });
+
+  return (
+    <mesh geometry={islandGeometryRef.current} ref={meshRef} position={[0, 0, 0]} castShadow receiveShadow>
+      <primitive object={customMaterial} attach="material" />
+    </mesh>
+  );
+};
+
+export default FloatingIsland;
+*/
