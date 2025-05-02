@@ -81,6 +81,7 @@ This project is architected not just as a personal portfolio, but as a **framewo
 | Principle | Implementation Strategy |
 |----------|-------------------------|
 | **Modular Sections** | Each feature (map, hobby scene, project card, etc.) is a plug-and-play component. |
+| **Canvas Gamification** | Interactive 3D world with orbital planets that transform into floating islands, plus 2D top-down tile map for content view. |
 | **Theming System** | Centralized theme config: colors, typography, assets (fantasy, cyberpunk, etc.) |
 | **Visitor Engine API** | WebSocket protocol abstracted to support future multitenancy |
 | **Plugin Slot System** | Expose `slots` where others can inject new UI (e.g., quests, NPCs, chat modules) |

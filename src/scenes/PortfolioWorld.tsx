@@ -16,15 +16,6 @@ interface Planet {
     rotationSpeed: number
     orbitRadius: number
     orbitSpeed: number
-    content: {
-        title: string
-        items: Array<{
-            id: string
-            title: string
-            description: string
-            link?: string
-        }>
-    }
 }
 
 type WorldTheme = 'space' | 'island'
@@ -42,21 +33,6 @@ const createSolarSystem = () => {
             rotationSpeed: 0.9,
             orbitRadius: 0.1,
             orbitSpeed: 1,
-            content: {
-                title: 'Professional Experience',
-                items: [
-                    {
-                        id: 'exp1',
-                        title: 'Senior Developer',
-                        description: 'Leading development teams and projects',
-                    },
-                    {
-                        id: 'exp2',
-                        title: 'Full Stack Developer',
-                        description: 'Building scalable web applications',
-                    }
-                ]
-            }
         },
         {
             id: 'projects',
@@ -69,23 +45,6 @@ const createSolarSystem = () => {
             rotationSpeed: 0.5,
             orbitRadius: 8,
             orbitSpeed: 1,
-            content: {
-                title: 'Featured Projects',
-                items: [
-                    {
-                        id: 'proj1',
-                        title: 'AI Assistant',
-                        description: 'An AI-powered assistant built with React and OpenAI',
-                        link: 'https://github.com/yourusername/ai-assistant'
-                    },
-                    {
-                        id: 'proj2',
-                        title: 'E-commerce Platform',
-                        description: 'A full-stack e-commerce solution',
-                        link: 'https://github.com/yourusername/ecommerce'
-                    }
-                ]
-            }
         },
         {
             id: 'hobbies',
@@ -98,21 +57,6 @@ const createSolarSystem = () => {
             rotationSpeed: 0.4,
             orbitRadius: 16,
             orbitSpeed: 0.6,
-            content: {
-                title: 'Creative Pursuits',
-                items: [
-                    {
-                        id: 'hobby1',
-                        title: 'Digital Art',
-                        description: 'Creating digital illustrations and designs'
-                    },
-                    {
-                        id: 'hobby2',
-                        title: 'Photography',
-                        description: 'Capturing moments and landscapes'
-                    }
-                ]
-            }
         },
         {
             id: 'skills',
@@ -125,21 +69,6 @@ const createSolarSystem = () => {
             rotationSpeed: 0.3,
             orbitRadius: 22,
             orbitSpeed: 0.4,
-            content: {
-                title: 'Technical Skills',
-                items: [
-                    {
-                        id: 'skill1',
-                        title: 'Frontend Development',
-                        description: 'React, TypeScript, Next.js'
-                    },
-                    {
-                        id: 'skill2',
-                        title: 'Backend Development',
-                        description: 'Node.js, Python, Databases'
-                    }
-                ]
-            }
         }
     ]
 
@@ -159,7 +88,6 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
     const [transitionProgress, setTransitionProgress] = useState(0)
     const initialPosition = useRef<THREE.Vector3>(new THREE.Vector3())
     const targetPosition = useRef<THREE.Vector3>(new THREE.Vector3())
-    // const lastTheme = useRef(theme)
     const lastOrbitalAngle = useRef(Math.random() * Math.PI * 2)
     const fixedIslandPosition = useRef<THREE.Vector3>(new THREE.Vector3())
     const islandGeometryRef = useRef<THREE.BufferGeometry>(new THREE.BufferGeometry())
@@ -231,7 +159,6 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
                     ? lastOrbitalAngle.current + 0.01 * planet.orbitSpeed * (1 - easedProgress)
                     : lastOrbitalAngle.current
 
-
                 // Interpolate between current and target angles with easing
                 const interpolatedAngle = THREE.MathUtils.lerp(
                     lastOrbitalAngle.current,
@@ -255,9 +182,11 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
 
             } else {
                 if (theme === 'space') {
-                    // In space theme, normal orbital motion
-                    lastOrbitalAngle.current += 0.01 * planet.orbitSpeed
-                    lastOrbitalAngle.current %= Math.PI * 2;
+                    // Only update orbital angle if not hovered
+                    if (!hovered) {
+                        lastOrbitalAngle.current += 0.01 * planet.orbitSpeed
+                        lastOrbitalAngle.current %= Math.PI * 2
+                    }
                     const x = Math.cos(lastOrbitalAngle.current) * planet.orbitRadius
                     const z = Math.sin(lastOrbitalAngle.current) * planet.orbitRadius
                     groupRef.current.position.set(x, 0, z)
@@ -304,14 +233,19 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
             rotationIntensity={theme === 'space' ? 0.2 : 0.1}
             floatIntensity={theme === 'space' ? 0.2 : 0.1}
         >
-            <group ref={groupRef} position={planet.orbitRadius === 0 ? planet.position : [0, 0, 0]}>
+            <group 
+                ref={groupRef} 
+                position={planet.orbitRadius === 0 ? planet.position : [0, 0, 0]}
+                onClick={() => onSelect(planet)}
+                onPointerOver={() => setHovered(true)}
+                onPointerOut={() => setHovered(false)}
+            >
                 {theme === 'space' ? (
                     <Sphere args={[planet.size, 32, 32]} ref={meshRef}>
                         {getMaterial()}
                     </Sphere>
                 ) : (
-                    <mesh geometry={islandGeometryRef.current} ref={meshRef}
->
+                    <mesh geometry={islandGeometryRef.current} ref={meshRef}>
                         {getMaterial()}
                     </mesh>
                 )}
@@ -339,27 +273,10 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
                 </Billboard>
                 {hovered && (
                     <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
-                        <Html position={[0, planet.size + 1, 0]} center>
+                        <Html position={[0, planet.size + 5.5, 0]} center>
                             <div className="bg-theme-background/90 p-4 rounded-lg shadow-lg max-w-xs border border-theme-accent/20">
-                                <h3 className="text-theme-foreground font-bold text-lg">{planet.content.title}</h3>
-                                <div className="mt-2 space-y-2">
-                                    {planet.content.items.map((item) => (
-                                        <div key={item.id} className="border-b border-theme-accent/20 pb-2">
-                                            <h4 className="text-theme-foreground font-semibold">{item.title}</h4>
-                                            <p className="text-theme-muted text-sm">{item.description}</p>
-                                            {item.link && (
-                                                <a
-                                                    href={item.link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-theme-accent text-sm hover:underline"
-                                                >
-                                                    View Project →
-                                                </a>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
+                                <h3 className="text-theme-foreground font-bold text-lg">{planet.name}</h3>
+                                <p className="text-theme-muted text-sm mt-2">{planet.description}</p>
                             </div>
                         </Html>
                     </Billboard>
@@ -369,16 +286,16 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
     )
 }
 
-export function PortfolioWorld() {
+export function PortfolioWorld({ onPlanetClick }: { onPlanetClick?: (planetId: string) => void }) {
     const { planets } = useMemo(() => createSolarSystem(), [])
     const { currentTheme } = useTheme()
     const isDarkMode = useStore((state) => state.isDarkMode)
-    const [_, setSelectedPlanet] = useState<Planet | null>(null)
     const [worldTheme, setWorldTheme] = useState<WorldTheme>('space')
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [transitionProgress, setTransitionProgress] = useState(0)
     const seaPlaneRef = useRef<THREE.Mesh>(null)
     const [showSeaPlane, setShowSeaPlane] = useState(false)
+    
 
     // Generate random points for particles
     const particles = useMemo(() => {
@@ -489,7 +406,7 @@ export function PortfolioWorld() {
                     <group key={planet.id}>
                         <PlanetNode
                             planet={planet}
-                            onSelect={setSelectedPlanet}
+                            onSelect={(planet) => onPlanetClick?.(planet.id)}
                             theme={worldTheme}
                             isTransitioning={isTransitioning}
                         />
