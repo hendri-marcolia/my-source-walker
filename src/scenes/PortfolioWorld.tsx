@@ -1,6 +1,6 @@
-import { useRef, useMemo, useState } from 'react'
+import { useRef, useMemo, useState, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Text, Line, Stars, Environment, Html, Float, Sphere, Ring, OrbitControls, Billboard, Points, PointMaterial, useTexture } from '@react-three/drei'
+import { Text, Line, Stars, Environment, Html, Float, Sphere, Ring, Billboard, Points, PointMaterial } from '@react-three/drei'
 import { useStore } from '../store/useStore'
 import { useTheme } from '../contexts/ThemeContext'
 import * as THREE from 'three'
@@ -67,7 +67,7 @@ const createSolarSystem = () => {
             size: 2,
             color: '#E24A4A',
             rotationSpeed: 0.5,
-            orbitRadius: 10,
+            orbitRadius: 8,
             orbitSpeed: 1,
             content: {
                 title: 'Featured Projects',
@@ -96,7 +96,7 @@ const createSolarSystem = () => {
             size: 2,
             color: '#4AE24A',
             rotationSpeed: 0.4,
-            orbitRadius: 14,
+            orbitRadius: 16,
             orbitSpeed: 0.6,
             content: {
                 title: 'Creative Pursuits',
@@ -123,7 +123,7 @@ const createSolarSystem = () => {
             size: 2,
             color: '#E2E24A',
             rotationSpeed: 0.3,
-            orbitRadius: 18,
+            orbitRadius: 22,
             orbitSpeed: 0.4,
             content: {
                 title: 'Technical Skills',
@@ -159,18 +159,53 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
     const [transitionProgress, setTransitionProgress] = useState(0)
     const initialPosition = useRef<THREE.Vector3>(new THREE.Vector3())
     const targetPosition = useRef<THREE.Vector3>(new THREE.Vector3())
-    const lastTheme = useRef(theme)
+    // const lastTheme = useRef(theme)
     const lastOrbitalAngle = useRef(Math.random() * Math.PI * 2)
     const fixedIslandPosition = useRef<THREE.Vector3>(new THREE.Vector3())
+    const islandGeometryRef = useRef<THREE.BufferGeometry>(new THREE.BufferGeometry())
 
     // Smooth easing function
     const easeInOutCubic = (x: number): number => {
         return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
     }
+    useEffect(() => {
+        const baseGeo = new THREE.IcosahedronGeometry(3, 4);
+        const position = baseGeo.attributes.position;
+        const vertex = new THREE.Vector3();
+    
+        for (let i = 0; i < position.count; i++) {
+          vertex.fromBufferAttribute(position, i);
+    
+          // Flatten top to create terrain cap
+          if (vertex.y > 0.5) vertex.y = 0.45;
+    
+          // Elongate bottom to create floating effect
+          if (vertex.y < 0) vertex.y *= 1.25;
+    
+          // Add noise
+        //   const noise = (Math.random() - 0.5) * 0.01;
+        //   vertex.x += noise;
+        //   vertex.y += noise * 0.1;
+        //   vertex.z += noise;
 
-    useFrame((state, delta) => {
+          // Add random terrain like effect
+          const terrain = Math.sin(vertex.x * 10) * Math.cos(vertex.z * 10) * Math.random() * 1.5;
+          vertex.y += terrain * 0.5;
+    
+          position.setXYZ(i, vertex.x, vertex.y, vertex.z);
+        }
+    
+        position.needsUpdate = true;
+        baseGeo.computeVertexNormals();
+    
+        // Assign to geometry ref
+        islandGeometryRef.current = baseGeo;
+      }, []);
+      
+
+    useFrame(() => {
         if (meshRef.current) {
-            meshRef.current.rotation.y += planet.rotationSpeed * delta
+            meshRef.current.rotation.y += planet.rotationSpeed * 0.01
         }
 
         if (groupRef.current && planet.orbitRadius > 0) {
@@ -193,7 +228,7 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
 
                 // Calculate target angle based on theme
                 const targetAngle = theme === 'space'
-                    ? lastOrbitalAngle.current + delta * planet.orbitSpeed * (1 - easedProgress)
+                    ? lastOrbitalAngle.current + 0.01 * planet.orbitSpeed * (1 - easedProgress)
                     : lastOrbitalAngle.current
 
 
@@ -206,7 +241,6 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
 
                 // Update last orbital angle
                 lastOrbitalAngle.current = interpolatedAngle
-                console.log("Transitioning with lastOrbitalAngle.current: ", lastOrbitalAngle.current)
 
                 // Calculate position with eased height transition
                 const x = Math.cos(interpolatedAngle) * planet.orbitRadius
@@ -222,15 +256,14 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
             } else {
                 if (theme === 'space') {
                     // In space theme, normal orbital motion
-                    lastOrbitalAngle.current += delta * planet.orbitSpeed
+                    lastOrbitalAngle.current += 0.01 * planet.orbitSpeed
                     lastOrbitalAngle.current %= Math.PI * 2;
                     const x = Math.cos(lastOrbitalAngle.current) * planet.orbitRadius
                     const z = Math.sin(lastOrbitalAngle.current) * planet.orbitRadius
                     groupRef.current.position.set(x, 0, z)
-                    console.log("Not transitioning with lastOrbitalAngle.current: ", lastOrbitalAngle.current)
                 } else {
                     // In island theme, use fixed position with small wave motion
-                    const waveY = Math.sin(delta * 0.5) * 0.1 // Reduced wave height
+                    const waveY = Math.sin(0.01 * 0.5) * 0.1 // Reduced wave height
                     groupRef.current.position.set(
                         fixedIslandPosition.current.x,
                         fixedIslandPosition.current.y + waveY,
@@ -238,22 +271,6 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
                     )
                 }
             }
-        }
-
-        // Update transition progress with smoother timing
-        if (isTransitioning) {
-            setTransitionProgress(prev => {
-                const newProgress = Math.min(prev + 0.005, 1) // Slower transition
-                return newProgress
-            })
-        } else {
-            setTransitionProgress(0)
-        }
-
-        // Reset transition when theme changes
-        if (lastTheme.current !== theme) {
-            setTransitionProgress(0)
-            lastTheme.current = theme
         }
     })
 
@@ -288,9 +305,16 @@ function PlanetNode({ planet, onSelect, theme, isTransitioning }: {
             floatIntensity={theme === 'space' ? 0.2 : 0.1}
         >
             <group ref={groupRef} position={planet.orbitRadius === 0 ? planet.position : [0, 0, 0]}>
-                <Sphere args={[planet.size, 32, 32]} ref={meshRef}>
-                    {getMaterial()}
-                </Sphere>
+                {theme === 'space' ? (
+                    <Sphere args={[planet.size, 32, 32]} ref={meshRef}>
+                        {getMaterial()}
+                    </Sphere>
+                ) : (
+                    <mesh geometry={islandGeometryRef.current} ref={meshRef}
+>
+                        {getMaterial()}
+                    </mesh>
+                )}
                 {theme === 'space' && (
                     <Ring args={[planet.size + 0.2, planet.size + 0.4, 32]} rotation={[Math.PI / 2, 0, 0]}>
                         <meshBasicMaterial
@@ -349,7 +373,7 @@ export function PortfolioWorld() {
     const { planets } = useMemo(() => createSolarSystem(), [])
     const { currentTheme } = useTheme()
     const isDarkMode = useStore((state) => state.isDarkMode)
-    const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null)
+    const [_, setSelectedPlanet] = useState<Planet | null>(null)
     const [worldTheme, setWorldTheme] = useState<WorldTheme>('space')
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [transitionProgress, setTransitionProgress] = useState(0)
@@ -359,7 +383,7 @@ export function PortfolioWorld() {
     // Generate random points for particles
     const particles = useMemo(() => {
         const temp = []
-        for (let i = 0; i < 2000; i++) {
+        for (let i = 0; i < 1000; i++) {
             const x = (Math.random() - 0.5) * 50
             const y = (Math.random() - 0.5) * 50
             const z = (Math.random() - 0.5) * 50
@@ -373,39 +397,48 @@ export function PortfolioWorld() {
         return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
     }
 
-    useFrame((state, delta) => {
-        // Update transition progress with smoother timing
-        if (isTransitioning) {
-            setTransitionProgress(prev => {
-                const newProgress = Math.min(prev + 0.005, 1) // Slower transition
-                return newProgress
-            })
-        } else {
-            setTransitionProgress(0)
-        }
+    const updateInterval = 5; // Update every 5 frames
+    const frameCounter = useRef(0);
 
-        // Animate sea plane
-        if (seaPlaneRef.current) {
-            const targetY = worldTheme === 'space' ? -20 : -2
-            const currentY = seaPlaneRef.current.position.y
-            const easedProgress = easeInOutCubic(transitionProgress)
-            
+    useFrame(() => {
+        frameCounter.current++;
+
+        if (frameCounter.current % updateInterval === 0) {
+            frameCounter.current = 0;
+
+            // Update transition progress with smoother timing
             if (isTransitioning) {
-                seaPlaneRef.current.position.y = THREE.MathUtils.lerp(
-                    currentY,
-                    targetY,
-                    easedProgress
-                )
-
-                // Update sea plane visibility
-                if (worldTheme === 'space' && transitionProgress > 0.9) {
-                    setShowSeaPlane(false)
-                } else if (worldTheme === 'island' && transitionProgress > 0.1) {
-                    setShowSeaPlane(true)
-                }
+                setTransitionProgress(prev => {
+                    const newProgress = Math.min(prev + 0.005, 1) // Slower transition
+                    return newProgress
+                })
             } else {
-                seaPlaneRef.current.position.y = targetY
-                setShowSeaPlane(worldTheme === 'island')
+                setTransitionProgress(0)
+            }
+
+            // Animate sea plane
+            if (seaPlaneRef.current) {
+                const targetY = worldTheme === 'space' ? -20 : -3
+                const currentY = seaPlaneRef.current.position.y
+                const easedProgress = easeInOutCubic(transitionProgress)
+                
+                if (isTransitioning) {
+                    seaPlaneRef.current.position.y = THREE.MathUtils.lerp(
+                        currentY,
+                        targetY,
+                        easedProgress
+                    )
+
+                    // Update sea plane visibility
+                    if (worldTheme === 'space' && transitionProgress > 0.9) {
+                        setShowSeaPlane(false)
+                    } else if (worldTheme === 'island' && transitionProgress > 0.1) {
+                        setShowSeaPlane(true)
+                    }
+                } else {
+                    seaPlaneRef.current.position.y = targetY
+                    setShowSeaPlane(worldTheme === 'island')
+                }
             }
         }
     })
@@ -423,7 +456,7 @@ export function PortfolioWorld() {
             <color attach="background" args={[isDarkMode ? currentTheme.colors.background : currentTheme.colors.foreground]} />
             {worldTheme === 'space' ? (
                 <>
-                    <Stars radius={100} depth={50} count={5000} factor={4} saturation={0.2} fade speed={1} />
+                    <Stars radius={100} depth={25} count={1000} factor={4} saturation={0.2} fade speed={1} />
                     <Environment preset="night" />
                 </>
             ) : (
