@@ -17,6 +17,9 @@ export default {
           muted: 'var(--theme-muted)',
         },
       },
+      fontFamily: {
+        game: ['"Press Start 2P"', 'cursive'],
+      },
     },
   },
   plugins: [],
