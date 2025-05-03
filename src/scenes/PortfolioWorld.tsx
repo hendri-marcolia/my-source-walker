@@ -500,7 +500,7 @@ export function PortfolioWorld({ onPlanetClick }: { onPlanetClick?: (planetId: s
                             transform: 'scale(1)',
                         }}
                     >
-                        {/* <button
+                        <button
                             onClick={handleThemeSwitch}
                             className="bg-white/10 hover:bg-white/20 text-white px-6 py-2.5 rounded-full transition-all backdrop-blur-md border border-white/20 shadow-lg"
                             style={{
@@ -513,7 +513,7 @@ export function PortfolioWorld({ onPlanetClick }: { onPlanetClick?: (planetId: s
                             }}
                         >
                             Switch to {worldTheme === 'space' ? 'Island' : 'Space'} Theme
-                        </button> */}
+                        </button>
                     </Html>
                 </group>
             </group>
