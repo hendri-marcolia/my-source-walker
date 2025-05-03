@@ -36,6 +36,63 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
     return t === 'G' || t === 'P' || npcMap[`${x},${y}`]
   }
 
+  // Pathfinding (BFS)
+  function findPath(start: { x: number; y: number }, end: { x: number; y: number }) {
+    if (start.x === end.x && start.y === end.y) return [];
+    const queue = [[start]];
+    const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+    visited[start.y][start.x] = true;
+    const directions = [
+      { dx: 0, dy: -1 }, // up
+      { dx: 0, dy: 1 },  // down
+      { dx: -1, dy: 0 }, // left
+      { dx: 1, dy: 0 },  // right
+    ];
+    while (queue.length) {
+      const path = queue.shift();
+      if (!path) break;
+      const { x, y } = path[path.length - 1];
+      if (x === end.x && y === end.y) return path;
+      for (const { dx, dy } of directions) {
+        const nx = x + dx, ny = y + dy;
+        if (
+          nx >= 0 && nx < cols && ny >= 0 && ny < rows &&
+          !visited[ny][nx] && (layout[ny][nx] === 'G' || layout[ny][nx] === 'P')
+        ) {
+          visited[ny][nx] = true;
+          queue.push([...path, { x: nx, y: ny }]);
+        }
+      }
+    }
+    return null; // No path
+  }
+
+  // Animate movement along a path
+  let timeoutId: NodeJS.Timeout;
+  function moveAlongPath(path: { x: number; y: number }[]) {
+    if (!path || path.length < 2) return;
+    let i = 1;
+    clearTimeout(timeoutId);
+    function step() {
+      setPlayerPosition(path[i]);
+      if (i < path.length - 1) {
+        timeoutId = setTimeout(step, 100);
+        i++;
+      }
+    }
+    step();
+  }
+
+  // Handle tile click for auto-navigation
+  function handleTileClick(x: number, y: number) {
+    if ((layout[y][x] === 'G' || layout[y][x] === 'P') && !(playerPosition.x === x && playerPosition.y === y)) {
+      const path = findPath(playerPosition, { x, y });
+      if (path && path.length > 1) {
+        moveAlongPath(path);
+      }
+    }
+  }
+
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -86,14 +143,14 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
         className="relative rounded-2xl overflow-hidden border-8 border-theme-accent/60 shadow-2xl game-card"
         style={{
           width: `${cols * TILE_SIZE}px`,
-          height: `${rows * TILE_SIZE + 80}px`,
+          height: `${rows * TILE_SIZE }px`,
           backgroundImage: `url(${background})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
       >
         {/* Info bar */}
-        {/* <div className="absolute top-0 left-0 right-0 h-16 bg-theme-accent/30 border-b-4 border-theme-accent/60 flex items-center justify-between px-8 z-10">
+        <div className="absolute top-0 left-0 right-0 h-16 bg-theme-accent/30 border-b-4 border-theme-accent/60 flex items-center justify-between px-8 z-10">
           <div className="flex items-center gap-6">
             <h2 className="text-2xl font-bold text-theme-foreground font-game tracking-widest">
               {planetId.charAt(0).toUpperCase() + planetId.slice(1)} World
@@ -108,27 +165,37 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
           >
             ✕
           </button>
-        </div> */}
-        {/* Debug: Tile borders overlay */}
+        </div>
+        {/* Debug: Tile borders overlay with click handler */}
         <div
-          className="absolute left-0 top-0 w-full h-full pointer-events-none z-10"
+          className="absolute left-0 top-0 w-full h-full pointer-events-auto z-10"
         >
           {Array.from({ length: rows }).map((_, y) =>
             Array.from({ length: cols }).map((_, x) => (
               <div
                 key={`debug-tile-${x}-${y}`}
+                onClick={() => handleTileClick(x, y)}
                 style={{
                   position: 'absolute',
                   left: x * TILE_SIZE,
                   top: y * TILE_SIZE,
                   width: TILE_SIZE,
                   height: TILE_SIZE,
-                  border: '2px dashed rgba(0,0,0,1)',
+                //   border: '2px dashed rgba(0,0,0,1)',
                   boxSizing: 'border-box',
-                  pointerEvents: 'none',
+                  pointerEvents: 'auto',
+                  cursor: (layout[y][x] === 'G' || layout[y][x] === 'P') ? 'pointer' : 'not-allowed',
+                  color: '#888',
+                  fontSize: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(255,255,255,0.01)',
+                  userSelect: 'none',
                 }}
+                title={`(${x},${y})`}
               >
-                {layout[y][x]}
+                {/* Optionally show tile type for debug: {layout[y][x]} */}
               </div>
             ))
           )}
@@ -234,4 +301,4 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
       </div>
     </motion.div>
   )
-} 
+}
