@@ -1,25 +1,78 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useState } from 'react'
-import { ContentTile } from './tiles/ContentTile'
+import { useState, useEffect } from 'react'
 import { Tile, planetContent } from './content/planetContent'
 
 interface TileMapViewProps {
-  planetId: string
-  onClose: () => void
+  planetId: string;
+  onClose: () => void;
+  layout: string[][];
+  background: string;
+  npcs: { x: number; y: number; id: string }[];
 }
 
-export function TileMapView({ planetId, onClose }: TileMapViewProps) {
+export function TileMapView({ planetId, onClose, layout, background, npcs }: TileMapViewProps) {
   const { currentTheme } = useTheme()
+  const rows = layout.length
+  const cols = layout[0].length
+  const TILE_SIZE = 32
+  // Player starts at center
+  const [playerPosition, setPlayerPosition] = useState<{ x: number; y: number }>({ x: Math.floor(cols / 5), y: Math.floor(rows / 5) })
   const [selectedTile, setSelectedTile] = useState<Tile | null>(null)
-  const [hoveredTile, setHoveredTile] = useState<string | null>(null)
+  const [isMoving, setIsMoving] = useState(false)
 
-  const tiles = planetContent[planetId] || []
+  // Get content for this planet
+  const contentTiles = planetContent[planetId] || []
+  // Map NPC positions to content
+  const npcMap: Record<string, Tile | undefined> = {}
+  npcs.forEach((npc, i) => {
+    npcMap[`${npc.x},${npc.y}`] = contentTiles[i]
+  })
 
-  const handleTileClick = (tile: Tile) => {
-    if (tile.type === 'content') {
-      setSelectedTile(tile)
+  // Movement logic: only allow walkable tiles
+  function isWalkable(x: number, y: number) {
+    if (x < 0 || y < 0 || y >= rows || x >= cols) return false
+    const t = layout[y][x]
+    return t === 'G' || t === 'P' || npcMap[`${x},${y}`]
+  }
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isMoving) return
+      let { x, y } = playerPosition
+      let nx = x, ny = y
+      switch (e.key) {
+        case 'ArrowUp': case 'w': case 'W': ny = y - 1; break
+        case 'ArrowDown': case 's': case 'S': ny = y + 1; break
+        case 'ArrowLeft': case 'a': case 'A': nx = x - 1; break
+        case 'ArrowRight': case 'd': case 'D': nx = x + 1; break
+        case 'Enter': case ' ': {
+          const npc = npcMap[`${x},${y}`]
+          if (npc) setSelectedTile(npc)
+          break
+        }
+        case 'Escape':
+          if (selectedTile) setSelectedTile(null)
+          else onClose()
+          break
+        default: return
+      }
+      if ((nx !== x || ny !== y) && isWalkable(nx, ny)) {
+        setIsMoving(true)
+        setPlayerPosition({ x: nx, y: ny })
+        setTimeout(() => setIsMoving(false), 120)
+      }
     }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [playerPosition, isMoving, npcMap, selectedTile, onClose])
+
+  // Helper: is player adjacent to a tile
+  function isPlayerAdjacent(x: number, y: number) {
+    const dx = Math.abs(playerPosition.x - x)
+    const dy = Math.abs(playerPosition.y - y)
+    return (dx + dy === 1)
   }
 
   return (
@@ -29,87 +82,151 @@ export function TileMapView({ planetId, onClose }: TileMapViewProps) {
       exit={{ opacity: 0, scale: 0.8 }}
       className="absolute inset-0 flex items-center justify-center"
     >
-      <div className="relative w-[800px] h-[600px] bg-theme-background/90 backdrop-blur-md rounded-lg overflow-hidden border border-theme-accent/20">
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 text-theme-foreground hover:text-theme-accent transition-colors"
+      <div
+        className="relative rounded-2xl overflow-hidden border-8 border-theme-accent/60 shadow-2xl game-card"
+        style={{
+          width: `${cols * TILE_SIZE}px`,
+          height: `${rows * TILE_SIZE + 80}px`,
+          backgroundImage: `url(${background})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        {/* Info bar */}
+        {/* <div className="absolute top-0 left-0 right-0 h-16 bg-theme-accent/30 border-b-4 border-theme-accent/60 flex items-center justify-between px-8 z-10">
+          <div className="flex items-center gap-6">
+            <h2 className="text-2xl font-bold text-theme-foreground font-game tracking-widest">
+              {planetId.charAt(0).toUpperCase() + planetId.slice(1)} World
+            </h2>
+            <span className="text-xs text-theme-background bg-theme-accent/80 px-3 py-1 rounded font-game ml-4">
+              Arrows/WASD: Move &nbsp;|&nbsp; Enter/Space: Interact &nbsp;|&nbsp; Esc: Close
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-theme-background bg-theme-accent/80 hover:bg-theme-accent transition-colors text-xl px-4 py-2 rounded font-game border-2 border-theme-accent/90"
+          >
+            ✕
+          </button>
+        </div> */}
+        {/* Debug: Tile borders overlay */}
+        <div
+          className="absolute left-0 top-0 w-full h-full pointer-events-none z-10"
         >
-          ✕
-        </button>
-
-        {/* Planet title */}
-        <h2 className="absolute top-4 left-4 text-2xl font-bold text-theme-foreground">
-          {planetId.charAt(0).toUpperCase() + planetId.slice(1)}
-        </h2>
-
-        {/* Tilemap container */}
-        <div className="w-full h-full p-8">
-          <div className="w-full h-full bg-theme-secondary/20 rounded-lg overflow-hidden">
-            {/* Grid of tiles */}
-            <div className="grid grid-cols-4 grid-rows-2 gap-4 h-full p-4">
-              {tiles.map((tile) => (
-                tile.type === 'content' ? (
-                  <ContentTile
-                    key={tile.id}
-                    id={tile.id}
-                    icon={tile.icon!}
-                    title={tile.title!}
-                    description={tile.description!}
-                    link={tile.link}
-                    onSelect={() => handleTileClick(tile)}
-                    isHovered={hoveredTile === tile.id}
-                    onHoverStart={() => setHoveredTile(tile.id)}
-                    onHoverEnd={() => setHoveredTile(null)}
-                  />
-                ) : (
-                  <div
-                    key={tile.id}
-                    className="bg-theme-secondary/10 rounded-lg"
-                  />
-                )
-              ))}
-            </div>
+          {Array.from({ length: rows }).map((_, y) =>
+            Array.from({ length: cols }).map((_, x) => (
+              <div
+                key={`debug-tile-${x}-${y}`}
+                style={{
+                  position: 'absolute',
+                  left: x * TILE_SIZE,
+                  top: y * TILE_SIZE,
+                  width: TILE_SIZE,
+                  height: TILE_SIZE,
+                  border: '2px dashed rgba(0,0,0,1)',
+                  boxSizing: 'border-box',
+                  pointerEvents: 'none',
+                }}
+              >
+                {layout[y][x]}
+              </div>
+            ))
+          )}
+        </div>
+        {/* Overlay container for player and NPCs */}
+        <div
+          className="absolute left-0 top-0 w-full h-full"
+          style={{ pointerEvents: 'none' }}
+        >
+          {/* NPCs/Places */}
+          {npcs.map((npc, i) => {
+            const tile = npcMap[`${npc.x},${npc.y}`]
+            if (!tile) return null
+            const isPlayerHere = playerPosition.x === npc.x && playerPosition.y === npc.y
+            return (
+              <motion.div
+                key={npc.id}
+                className="absolute flex flex-col items-center justify-center select-none"
+                style={{
+                  left: npc.x * TILE_SIZE,
+                  top: npc.y * TILE_SIZE,
+                  width: TILE_SIZE,
+                  height: TILE_SIZE,
+                  pointerEvents: 'auto',
+                }}
+                initial={{ y: 0 }}
+                animate={{ y: [0, -6, 0, 4, 0] }}
+                transition={{ duration: 2, repeat: Infinity, repeatType: 'loop', delay: (i % 6) * 0.1 }}
+              >
+                <span className="text-3xl mb-1" role="img" aria-label={tile.title}>{tile.icon}</span>
+                {/* Only show name if player is here */}
+                {isPlayerHere && (
+                  <span className="text-xs font-game text-theme-accent text-center max-w-[80px] truncate">{tile.title}</span>
+                )}
+                {/* Highlight if player is adjacent */}
+                {isPlayerAdjacent(npc.x, npc.y) && !isPlayerHere && (
+                  <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-yellow-400 text-theme-background font-game text-xs px-2 py-1 rounded shadow-lg z-20 animate-bounce">!</span>
+                )}
+                {/* Interact hint if player is here */}
+                {isPlayerHere && (
+                  <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-theme-accent/90 text-theme-background font-game text-xs px-2 py-1 rounded shadow-lg z-20">Press Enter/Space</span>
+                )}
+              </motion.div>
+            )
+          })}
+          {/* Player */}
+          <motion.div
+            className="absolute z-10"
+            style={{
+              left: playerPosition.x * TILE_SIZE,
+              top: playerPosition.y * TILE_SIZE,
+              width: TILE_SIZE,
+              height: TILE_SIZE,
+              pointerEvents: 'none',
+            }}
+            initial={{ scale: 0.7, y: 0 }}
+            animate={{ scale: [0.7, 1.1, 0.9, 1], y: [0, -8, 0, 4, 0] }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="w-8 h-8 bg-yellow-300 rounded-full border-2 border-yellow-500 shadow-lg mx-auto my-auto" />
+          </motion.div>
+        </div>
+        {/* Game-like UI elements */}
+        <div className="absolute bottom-4 right-4 flex items-center gap-4 z-20">
+          <div className="bg-theme-accent/20 px-4 py-2 rounded-lg border-2 border-theme-accent/30">
+            <span className="text-sm text-theme-foreground font-game">Position: {playerPosition.x + 1}, {playerPosition.y + 1}</span>
           </div>
         </div>
-
-        {/* Selected tile content overlay */}
+        {/* Game-like content overlay */}
         <AnimatePresence>
           {selectedTile && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="absolute inset-0 bg-theme-background/95 backdrop-blur-md p-8"
+              className="absolute inset-0 bg-theme-background/95 backdrop-blur-md p-8 flex items-center justify-center"
             >
-              <div className="h-full flex flex-col">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <span className="text-4xl mr-4">{selectedTile.icon}</span>
-                    <h2 className="text-2xl font-bold text-theme-accent inline-block">
-                      {selectedTile.title}
-                    </h2>
-                  </div>
-                  <button
-                    onClick={() => setSelectedTile(null)}
-                    className="text-theme-foreground hover:text-theme-accent transition-colors"
+              <div className="bg-theme-secondary/90 rounded-lg p-8 max-w-lg w-full shadow-2xl border-4 border-theme-accent/40 flex flex-col items-center">
+                <span className="text-5xl mb-4" role="img" aria-label={selectedTile.title}>{selectedTile.icon}</span>
+                <h2 className="text-2xl font-bold text-theme-accent font-game mb-2 text-center">{selectedTile.title}</h2>
+                <p className="text-theme-foreground mb-6 text-center">{selectedTile.description}</p>
+                {selectedTile.link && (
+                  <a
+                    href={selectedTile.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-theme-accent/20 hover:bg-theme-accent/30 rounded-lg text-theme-accent transition-colors font-game text-sm"
                   >
-                    ✕
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto">
-                  <p className="text-theme-foreground mb-4">{selectedTile.description}</p>
-                  {selectedTile.link && (
-                    <a
-                      href={selectedTile.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-theme-accent hover:text-theme-accent/80"
-                    >
-                      Learn More →
-                    </a>
-                  )}
-                </div>
+                    <span>Explore Quest</span>
+                    <span>→</span>
+                  </a>
+                )}
+                <button
+                  onClick={() => setSelectedTile(null)}
+                  className="mt-6 px-4 py-2 bg-theme-accent/80 text-theme-background font-game rounded shadow hover:bg-theme-accent/90"
+                >
+                  Close
+                </button>
               </div>
             </motion.div>
           )}

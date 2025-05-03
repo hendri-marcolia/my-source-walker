@@ -390,6 +390,7 @@ export function PortfolioWorld({ onPlanetClick }: { onPlanetClick?: (planetId: s
             >
                 <planeGeometry args={[100, 100]} />
                 <meshStandardMaterial
+                    
                     color="#2196F3" // Blue water color
                     roughness={0.1}
                     metalness={0.2}
@@ -489,21 +490,32 @@ export function PortfolioWorld({ onPlanetClick }: { onPlanetClick?: (planetId: s
                 </Points>
 
                 {/* Theme Switcher */}
-                <Html position={[0, 10, 0]} center>
-                    <button
-                        onClick={handleThemeSwitch}
-                        className="bg-white/10 hover:bg-white/20 text-white px-6 py-2.5 rounded-full transition-all backdrop-blur-md border border-white/20 shadow-lg"
+                <group position={[0, 10, 0]}>
+                    <Html
+                        transform
+                        distanceFactor={25}
                         style={{
-                            fontFamily: 'system-ui, sans-serif',
-                            fontSize: '0.875rem',
-                            letterSpacing: '0.025em',
-                            textShadow: '0 1px 2px rgba(0,0,0,0.2)',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1), inset 0 1px 1px rgba(255,255,255,0.1)'
+                            transition: 'all 0.2s',
+                            opacity: 1,
+                            transform: 'scale(1)',
                         }}
                     >
-                        Switch to {worldTheme === 'space' ? 'Island' : 'Space'} Theme
-                    </button>
-                </Html>
+                        {/* <button
+                            onClick={handleThemeSwitch}
+                            className="bg-white/10 hover:bg-white/20 text-white px-6 py-2.5 rounded-full transition-all backdrop-blur-md border border-white/20 shadow-lg"
+                            style={{
+                                fontFamily: 'system-ui, sans-serif',
+                                fontSize: '0.875rem',
+                                letterSpacing: '0.025em',
+                                textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1), inset 0 1px 1px rgba(255,255,255,0.1)',
+                                zIndex: -999
+                            }}
+                        >
+                            Switch to {worldTheme === 'space' ? 'Island' : 'Space'} Theme
+                        </button> */}
+                    </Html>
+                </group>
             </group>
         </>
     )
