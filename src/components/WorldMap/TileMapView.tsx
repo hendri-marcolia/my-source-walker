@@ -78,6 +78,8 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
       if (i < path.length - 1) {
         timeoutId = setTimeout(step, 100);
         i++;
+      }else {
+        setIsMoving(false)
       }
     }
     step();
@@ -85,9 +87,10 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
 
   // Handle tile click for auto-navigation
   function handleTileClick(x: number, y: number) {
-    if ((layout[y][x] === 'G' || layout[y][x] === 'P') && !(playerPosition.x === x && playerPosition.y === y)) {
+    if ((layout[y][x] === 'G' || layout[y][x] === 'P') && !(playerPosition.x === x && playerPosition.y === y) && !isMoving) {
       const path = findPath(playerPosition, { x, y });
       if (path && path.length > 1) {
+        setIsMoving(true)
         moveAlongPath(path);
       }
     }
