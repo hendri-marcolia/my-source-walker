@@ -23,14 +23,14 @@ export async function scanDirectory(path: string): Promise<FileNode> {
   }
 }
 
-export function calculateNodePosition(node: FileNode, index: number, total: number): [number, number, number] {
-  const radius = 5
-  const angle = (index / total) * Math.PI * 2
-  const x = Math.cos(angle) * radius
-  const y = 0
-  const z = Math.sin(angle) * radius
-  return [x, y, z]
-}
+// export function calculateNodePosition(node: FileNode, index: number, total: number): [number, number, number] {
+//   const radius = 5
+//   const angle = (index / total) * Math.PI * 2
+//   const x = Math.cos(angle) * radius
+//   const y = 0
+//   const z = Math.sin(angle) * radius
+//   return [x, y, z]
+// }
 
 export function getFileColor(fileName: string): string {
   // Add file type color mapping based on extension

@@ -1,6 +1,6 @@
 import { useRef, useMemo, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Box, Text, Line, useTexture, Stars, Environment } from '@react-three/drei'
+import { Box, Text, Line, Stars, Environment } from '@react-three/drei'
 import { useStore } from '../store/useStore'
 import { useTheme } from '../contexts/ThemeContext'
 import * as THREE from 'three'
