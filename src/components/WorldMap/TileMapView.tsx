@@ -198,7 +198,8 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
                 }}
                 title={`(${x},${y})`}
               >
-                {/* Optionally show tile type for debug: {layout[y][x]} */}
+                {/* {layout[y][x]}  */}
+                {/* Optionally show tile type for debug: */}
               </div>
             ))
           )}
