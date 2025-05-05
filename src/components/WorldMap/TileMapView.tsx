@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Tile, planetContent } from './content/planetContent'
 
 interface TileMapViewProps {
@@ -19,11 +19,10 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
   // Player starts at center
   const [playerPosition, setPlayerPosition] = useState<{ x: number; y: number }>({ x: Math.floor(cols / 5), y: Math.floor(rows / 5) })
   const [selectedTile, setSelectedTile] = useState<Tile | null>(null)
-  const [isMoving, setIsMoving] = useState(false)
+  const [isMoving, setIsMoving] = useState(false);
+  const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[] | null>(null);
 
-  // Get content for this planet
-  const contentTiles = planetContent[planetId] || []
-  // Map NPC positions to content
+  const contentTiles = planetContent[planetId] || [];
   const npcMap: Record<string, Tile | undefined> = {}
   npcs.forEach((npc, i) => {
     npcMap[`${npc.x},${npc.y}`] = contentTiles[i]
@@ -37,7 +36,7 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
   }
 
   // Pathfinding (BFS)
-  function findPath(start: { x: number; y: number }, end: { x: number; y: number }) {
+  const findPath = useCallback((start: { x: number; y: number }, end: { x: number; y: number }) => {
     if (start.x === end.x && start.y === end.y) return [];
     const queue = [[start]];
     const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
@@ -65,12 +64,13 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
       }
     }
     return null; // No path
-  }
+  }, [cols, rows, layout]);
 
   // Animate movement along a path
   let timeoutId: NodeJS.Timeout;
-  function moveAlongPath(path: { x: number; y: number }[]) {
+  const moveAlongPath = useCallback((path: { x: number; y: number }[]) => {
     if (!path || path.length < 2) return;
+    setCurrentPath(path);
     let i = 1;
     clearTimeout(timeoutId);
     function step() {
@@ -78,23 +78,23 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
       if (i < path.length - 1) {
         timeoutId = setTimeout(step, 100);
         i++;
-      }else {
-        setIsMoving(false)
+      } else {
+        setIsMoving(false);
+        setCurrentPath(null);
       }
     }
     step();
-  }
+  }, [setCurrentPath, setPlayerPosition, setIsMoving]);
 
-  // Handle tile click for auto-navigation
-  function handleTileClick(x: number, y: number) {
+  const handleTileClick = useCallback((x: number, y: number) => {
     if ((layout[y][x] === 'G' || layout[y][x] === 'P') && !(playerPosition.x === x && playerPosition.y === y) && !isMoving) {
       const path = findPath(playerPosition, { x, y });
       if (path && path.length > 1) {
-        setIsMoving(true)
+        setIsMoving(true);
         moveAlongPath(path);
       }
     }
-  }
+  }, [playerPosition, layout, isMoving, findPath, moveAlongPath]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -129,11 +129,12 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
   }, [playerPosition, isMoving, npcMap, selectedTile, onClose])
 
   // Helper: is player adjacent to a tile
-  function isPlayerAdjacent(x: number, y: number) {
+  const isPlayerAdjacent = useCallback((x: number, y: number) => {
     const dx = Math.abs(playerPosition.x - x)
     const dy = Math.abs(playerPosition.y - y)
     return (dx + dy === 1)
-  }
+  }, [playerPosition.x, playerPosition.y])
+  
 
   return (
     <motion.div 
@@ -169,39 +170,45 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
             ✕
           </button>
         </div>
-        {/* Debug: Tile borders overlay with click handler */}
+        {/* Debug: Tile borders overlay with click handler and path highlight */}
         <div
           className="absolute left-0 top-0 w-full h-full pointer-events-auto z-10"
         >
           {Array.from({ length: rows }).map((_, y) =>
-            Array.from({ length: cols }).map((_, x) => (
-              <div
-                key={`debug-tile-${x}-${y}`}
-                onClick={() => handleTileClick(x, y)}
-                style={{
-                  position: 'absolute',
-                  left: x * TILE_SIZE,
-                  top: y * TILE_SIZE,
-                  width: TILE_SIZE,
-                  height: TILE_SIZE,
-                //   border: '2px dashed rgba(0,0,0,1)',
-                  boxSizing: 'border-box',
-                  pointerEvents: 'auto',
-                  cursor: (layout[y][x] === 'G' || layout[y][x] === 'P') ? 'pointer' : 'not-allowed',
-                  color: '#888',
-                  fontSize: 10,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(255,255,255,0.01)',
-                  userSelect: 'none',
-                }}
-                title={`(${x},${y})`}
-              >
-                {/* {layout[y][x]}  */}
-                {/* Optionally show tile type for debug: */}
-              </div>
-            ))
+            Array.from({ length: cols }).map((_, x) => {
+              const isInPath = currentPath && currentPath.some(p => p.x === x && p.y === y);
+              return (
+                <div
+                  key={`debug-tile-${x}-${y}`}
+                  onClick={() => handleTileClick(x, y)}
+                  style={{
+                    position: 'absolute',
+                    left: x * TILE_SIZE,
+                    top: y * TILE_SIZE,
+                    width: TILE_SIZE,
+                    height: TILE_SIZE,
+                    boxSizing: 'border-box',
+                    pointerEvents: 'auto',
+                    cursor: (layout[y][x] === 'G' || layout[y][x] === 'P') ? 'pointer' : 'not-allowed',
+                    color: '#888',
+                    fontSize: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    userSelect: 'none',
+                    borderRadius: '25px',
+                    background: isInPath ? 'rgba(56,189,248,0.35)' : 'rgba(255,255,255,0.01)', // sky-400
+                    border: isInPath ? '2px solid #38bdf8' : '0px',
+                    // boxShadow: isInPath ? '0 0 12px 4px #38bdf8aa' : undefined,
+                    transition: 'background 0.2s, border 0.2s, box-shadow 0.2s',
+                  }}
+                  title={`(${x},${y})`}
+                >
+                  {/* {layout[y][x]}  */}
+                  {/* Optionally show tile type for debug: */}
+                </div>
+              );
+            })
           )}
         </div>
         {/* Overlay container for player and NPCs */}
