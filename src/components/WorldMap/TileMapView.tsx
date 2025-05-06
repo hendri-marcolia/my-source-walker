@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Tile, planetContent } from './content/planetContent'
 
 interface TileMapViewProps {
@@ -55,7 +55,7 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
       for (const { dx, dy } of directions) {
         const nx = x + dx, ny = y + dy;
         if (
-          nx >= 0 && nx < cols && ny >= 0 && ny < rows &&
+          nx >= 0 && nx < cols && ny < rows &&
           !visited[ny][nx] && (layout[ny][nx] === 'G' || layout[ny][nx] === 'P')
         ) {
           visited[ny][nx] = true;
@@ -134,7 +134,93 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
     const dy = Math.abs(playerPosition.y - y)
     return (dx + dy === 1)
   }, [playerPosition.x, playerPosition.y])
-  
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const mapRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setStartPos({ x: e.clientX, y: e.clientY });
+    if (mapRef.current) {
+      mapRef.current.style.cursor = 'grabbing';
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    if (mapRef.current) {
+      mapRef.current.style.cursor = 'grab';
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const dx = e.clientX - startPos.x;
+    const dy = e.clientY - startPos.y;
+
+    // Calculate pan limits
+    const mapWidth = cols * TILE_SIZE;
+    const mapHeight = rows * TILE_SIZE;
+    const containerWidth = mapRef.current ? mapRef.current.offsetWidth : 0;
+    const containerHeight = mapRef.current ? mapRef.current.offsetHeight : 0;
+
+    const minPanX = containerWidth - mapWidth;
+    const maxPanX = 0;
+    const minPanY = containerHeight - mapHeight;
+    const maxPanY = 0;
+
+    let newPanX = pan.x + dx;
+    let newPanY = pan.y + dy;
+
+    newPanX = Math.max(minPanX, Math.min(maxPanX, newPanX));
+    newPanY = Math.max(minPanY, Math.min(maxPanY, newPanY));
+
+    setPan(p => ({
+      x: newPanX,
+      y: newPanY,
+    }));
+    setStartPos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setIsDragging(true);
+    setStartPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const dx = e.touches[0].clientX - startPos.x;
+    const dy = e.touches[0].clientY - startPos.y;
+
+        // Calculate pan limits
+    const mapWidth = cols * TILE_SIZE;
+    const mapHeight = rows * TILE_SIZE;
+    const containerWidth = mapRef.current ? mapRef.current.offsetWidth : 0;
+    const containerHeight = mapRef.current ? mapRef.current.offsetHeight : 0;
+
+    const minPanX = containerWidth - mapWidth;
+    const maxPanX = 0;
+    const minPanY = containerHeight - mapHeight;
+    const maxPanY = 0;
+
+    let newPanX = pan.x + dx;
+    let newPanY = pan.y + dy;
+
+    newPanX = Math.max(minPanX, Math.min(maxPanX, newPanX));
+    newPanY = Math.max(minPanY, Math.min(maxPanY, newPanY));
+
+    setPan(p => ({
+      x: newPanX,
+      y: newPanY,
+    }));
+    setStartPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
 
   return (
     <motion.div 
@@ -146,13 +232,32 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
       <div
         className="relative rounded-2xl overflow-hidden border-8 border-theme-accent/60 shadow-2xl game-card"
         style={{
-          width: `${cols * TILE_SIZE}px`,
-          height: `${rows * TILE_SIZE }px`,
-          backgroundImage: `url(${background})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          width: '100%',
+          height: '100%',
+          maxWidth: `${cols * TILE_SIZE}px`,
+          maxHeight: `${rows * TILE_SIZE}px`,
         }}
+        ref={mapRef}
       >
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            cursor: 'grab',
+            transform: `translate(${pan.x}px, ${pan.y}px)`,
+            backgroundImage: `url(${background})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onTouchCancel={handleTouchEnd}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={handleTouchMove}
+          onTouchStart={handleTouchStart}
+        >
         {/* Info bar */}
         <div className="absolute top-0 left-0 right-0 h-16 bg-theme-accent/30 border-b-4 border-theme-accent/60 flex items-center justify-between px-8 z-10">
           <div className="flex items-center gap-6">
@@ -197,8 +302,8 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
                     justifyContent: 'center',
                     userSelect: 'none',
                     borderRadius: '25px',
-                    background: isInPath ? 'rgba(56,189,248,0.35)' : 'rgba(255,255,255,0.01)', // sky-400
-                    border: isInPath ? '2px solid #38bdf8' : '0px',
+                    background: isInPath ? 'rgba(56,189,248,0.35)' : undefined, // sky-400
+                    border: isInPath ? '2px solid #38bdf8' : undefined,
                     // boxShadow: isInPath ? '0 0 12px 4px #38bdf8aa' : undefined,
                     transition: 'background 0.2s, border 0.2s, box-shadow 0.2s',
                   }}
@@ -260,7 +365,7 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
               top: playerPosition.y * TILE_SIZE,
               width: TILE_SIZE,
               height: TILE_SIZE,
-              pointerEvents: 'none',
+              pointerEvents: 'none'
             }}
             initial={{ scale: 0.7, y: 0 }}
             animate={{ scale: [0.7, 1.1, 0.9, 1], y: [0, -8, 0, 4, 0] }}
@@ -309,6 +414,7 @@ export function TileMapView({ planetId, onClose, layout, background, npcs }: Til
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
     </motion.div>
   )
