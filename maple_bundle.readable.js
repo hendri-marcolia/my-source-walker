@@ -5961,7 +5961,7 @@
     requestAtk(t, e) {
       ((this.isCastSkill = !1),
         Laya.timer.once(
-          BattleScript.RESET_CAST_SKILL_TIME * 0.01,
+          BattleScript.RESET_CAST_SKILL_TIME * 0.15,
           this,
           this.resetCastSkill,
           [this.handleId, t, e],
@@ -6036,7 +6036,7 @@
       !this.useSkillFailObj && (this.useSkillFailObj = {});
       let l = Laya.Browser.now(),
         o = ModuleMgr.ins.Module_server.getServerMiliseconds(),
-        r = 0.01 * BattleScript.RESET_CAST_SKILL_TIME;
+        r = 0.1 * BattleScript.RESET_CAST_SKILL_TIME;
       ((null === (s = this.useSkillFailObj) || void 0 === s ? void 0 : s[i]) &&
         (null === (a = this.useSkillFailObj) || void 0 === a
           ? void 0
@@ -172439,6 +172439,7 @@
       }
     }
     static reportError(t) {
+      return;
       if (urlParam.reportRoot) {
         var e = urlParam.reportRoot + "/backlog/log?type=clienterror",
           i = JSON.stringify({
